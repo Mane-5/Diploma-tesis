@@ -1,18 +1,15 @@
-!pip install geopandas networkx matplotlib shapely requests
-import geopandas as gpd
 import matplotlib.pyplot as plt
 import networkx as nx
-from shapely.geometry import Polygon
-import pandas as pd
 #1․Հայաստանի մարզերի և Երևանի հարևանության կապերի հիման վրա Dual Graph
+
 G = nx.Graph()
 regions = [
     "Երևան", "Արագածոտն", "Արարատ", "Արմավիր",
     "Գեղարքունիք", "Կոտայք", "Լոռի", "Շիրակ",
     "Սյունիք", "Տավուշ", "Վայոց ձոր"
 ]
-
 G.add_nodes_from(regions)
+
 edges = [
     ("Երևան", "Արագածոտն"),
     ("Երևան", "Արարատ"),
@@ -29,45 +26,30 @@ edges = [
     ("Արարատ", "Գեղարքունիք"),
     ("Արարատ", "Վայոց ձոր"),
 
-    ("Կոտայք", "Արագածոտն"),
-    ("Կոտայք", "Արարատ"),
-    ("Կոտայք", "Երևան"),
     ("Կոտայք", "Գեղարքունիք"),
     ("Կոտայք", "Լոռի"),
     ("Կոտայք", "Տավուշ"),
 
-    ("Գեղարքունիք", "Կոտայք"),
-    ("Գեղարքունիք", "Արարատ"),
     ("Գեղարքունիք", "Վայոց ձոր"),
     ("Գեղարքունիք", "Տավուշ"),
+    ("Գեղարքունիք", "Սյունիք"),
 
     ("Լոռի", "Շիրակ"),
-    ("Լոռի", "Արագածոտն"),
-    ("Լոռի", "Կոտայք"),
     ("Լոռի", "Տավուշ"),
 
-    ("Շիրակ", "Լոռի"),
-    ("Շիրակ", "Արագածոտն"),
-
-    ("Վայոց ձոր", "Արարատ"),
-    ("Վայոց ձոր", "Գեղարքունիք"),
     ("Վայոց ձոր", "Սյունիք"),
-
-    ("Սյունիք", "Վայոց ձոր"),
-
-    ("Տավուշ", "Լոռի"),
-    ("Տավուշ", "Կոտայք"),
-    ("Տավուշ", "Գեղարքունիք")
 ]
 G.add_edges_from(edges)
 
-print(f"Գրաֆը հաջողությամբ կառուցված է։")
+print("Գրաֆը հաջողությամբ կառուցված է։")
 print(f"Գագաթներ (Մարզեր) — {G.number_of_nodes()}")
 print(f"Կողեր (Հարևանության կապեր) — {G.number_of_edges()}")
 
+
 #2․Welsh-Powell Գրաֆի գունավորման ալգորիթմ։
+
 def welsh_powell_coloring(graph):
-    # Քայլ 1: Տեսակավորել գագաթները ըստ աստիճանի նվազման (deg(v))
+    # Քայլ 1: գագաթների տեսակավորում ըստ աստիճանի նվազման
     sorted_nodes = sorted(graph.nodes(), key=lambda n: graph.degree(n), reverse=True)
 
     color_map = {}
@@ -76,31 +58,48 @@ def welsh_powell_coloring(graph):
     for node in sorted_nodes:
         if node not in color_map:
             color_map[node] = current_color
-            # Գտնում ենք մնացած չներկված գագաթները, որոնք հարևան չեն այս գույնի հետ
-            for other_node in sorted_nodes:
-                if other_node not in color_map:
-                    has_neighbor_with_color = any(
-                        graph.has_edge(other_node, neighbor) and color_map.get(neighbor) == current_color
-                        for neighbor in graph.nodes()
+            # Նույն գույնով ներկում ենք չներկված այն գագաթները,
+            # որոնք այդ գույնի հետ ներկված հարևան չունեն
+            for other in sorted_nodes:
+                if other not in color_map:
+                    conflict = any(
+                        color_map.get(nb) == current_color
+                        for nb in graph.neighbors(other)
                     )
-                    if not has_neighbor_with_color:
-                        color_map[other_node] = current_color
+                    if not conflict:
+                        color_map[other] = current_color
             current_color += 1
 
     return color_map
   
-  #3․Ալգորիթմի կիրառումը  կառուցված G գրաֆի վրա
+  #3․Ալգորիթմի կիրառումը և արդյունքների ստուգում
+
   color_assignment = welsh_powell_coloring(G)
-print("--- ՄԱՐԶԵՐԻ ԵՎ ԵՐԵՎԱՆԻ ԳՈՒՆԱՎՈՐՄԱՆ ԱՐԴՅՈՒՆՔՆԵՐԸ ---")
-max_color = 0
+
+print("\n--- ՄԱՐԶԵՐԻ ԵՎ ԵՐԵՎԱՆԻ ԳՈՒՆԱՎՈՐՄԱՆ ԱՐԴՅՈՒՆՔՆԵՐԸ ---")
 for node, color in sorted(color_assignment.items(), key=lambda x: x[1]):
     print(f"Մարզ/Քաղաք: {node:<15} | Գույն ID: {color} | Հարևանների քանակ (deg): {G.degree(node)}")
-    if color > max_color:
-        max_color = color
 
-print(f"\nՕգտագործված գույների նվազագույն քանակը (Քրոմատիկ թիվ - $\chi(G)$): {max_color + 1}")
+num_colors = max(color_assignment.values()) + 1
+print(f"\nWelsh–Powell-ով օգտագործված գույների քանակը: {num_colors}")
 
-#4․Վիզուալիզացիա
+# Ներկման ճշտության ստուգում՝ հարևանները չպետք է ունենան նույն գույնը
+is_proper = all(color_assignment[u] != color_assignment[v] for u, v in G.edges())
+print(f"Ներկումը ճիշտ է (հարևանները՝ տարբեր գույներ): {is_proper}")
+
+# Ստորին գնահատական՝ մաքսիմալ կլիկի չափը (ω(G) <= χ(G))
+clique_size = max(len(c) for c in nx.find_cliques(G))
+print(f"Ստորին գնահատական (մաքսիմալ կլիկ ω(G)): {clique_size}")
+if num_colors == clique_size:
+    print(f"Ներկումը օպտիմալ է՝ χ(G) = {clique_size}")
+    
+#4.Համեմատության համար՝ DSATUR 
+dsatur = nx.coloring.greedy_color(G, strategy="DSATUR")
+print(f"DSATUR-ով օգտագործված գույների քանակը: {max(dsatur.values()) + 1}")
+
+
+#5․Վիզուալիզացիա
+
 plt.figure(figsize=(10, 8))
 palette = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4']
 geographic_pos = {
@@ -117,11 +116,14 @@ geographic_pos = {
     "Սյունիք": (7.0, 0.5)
 }
 
-node_colors = [palette[color_assignment[node] % len(palette)] for node in G.nodes()]
-nx.draw_networkx_nodes(G, geographic_pos, node_color=node_colors, node_size=1800, edgecolors='black', linewidths=1.5)
+node_colors = [palette[color_assignment[n] % len(palette)] for n in G.nodes()]
+nx.draw_networkx_nodes(G, geographic_pos, node_color=node_colors,
+                       node_size=1800, edgecolors='black', linewidths=1.5)
 nx.draw_networkx_edges(G, geographic_pos, width=2, alpha=0.6, edge_color='gray')
-nx.draw_networkx_labels(G, geographic_pos, font_size=9, font_weight='bold', font_family='sans-serif')
-plt.title("ՀՀ Մարզերի Հարևանության Գրաֆը՝ Ըստ Աշխարհագրական Դիրքերի", fontsize=13, fontweight='bold', pad=20)
+nx.draw_networkx_labels(G, geographic_pos, font_size=9, font_weight='bold',
+                        font_family='sans-serif')
+plt.title("ՀՀ Մարզերի Հարևանության Գրաֆը՝ Ըստ Աշխարհագրական Դիրքերի",
+          fontsize=13, fontweight='bold', pad=20)
 plt.axis('off')
 plt.tight_layout()
 plt.savefig('armenia_graph_coloring.png', dpi=300, bbox_inches='tight')
